@@ -1,0 +1,10 @@
+@import "tailwindcss";
+
+/* If you want to keep the custom styling from before */
+@layer base {
+  body {
+    margin: 0;
+    font-family: 'Inter', sans-serif;
+    background-color: #f8fafc;
+  }
+}
