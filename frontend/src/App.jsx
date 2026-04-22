@@ -11,7 +11,10 @@ import EventManagement from './pages/admin/EventManagement';
 import LostFoundManagement from './pages/admin/LostFoundManagement';
 import AnalyticsPage from './pages/admin/AnalyticsPage';
 import FacultyAttendanceManagement from './pages/admin/FacultyAttendanceManagement';
+
+
 import FacultyAttendancePage from './pages/faculty/FacultyAttendancePage';
+
 import FacultyDashboard from './pages/faculty/FacultyDashboard';
 import StudentDashboard from './pages/StudentDashboard';
 
