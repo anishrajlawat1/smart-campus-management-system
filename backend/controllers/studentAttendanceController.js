@@ -143,6 +143,8 @@ exports.getAttendance = async (req, res) => {
     let query = `
       SELECT 
         a.id,
+        a.student_id,
+        a.subject_id,
         a.date,
         a.status,
         u.name AS student_name,

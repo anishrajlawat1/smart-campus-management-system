@@ -226,6 +226,14 @@ const FacultyAttendancePage = () => {
     }
   }, [selectedGroup]);
 
+  useEffect(() => {
+    if (selectedSubject && selectedDate) {
+      fetchAttendance();
+    } else {
+      setAttendance([]);
+    }
+  }, [selectedSubject, selectedDate, selectedGroup]);
+
   const markAttendance = async (studentId, status) => {
     if (!selectedSubject) {
       alert('Please select a subject first');
@@ -245,6 +253,14 @@ const FacultyAttendancePage = () => {
     } catch (error) {
       alert(error.response?.data?.message || 'Failed to save attendance');
     }
+  };
+
+  const getStudentAttendanceStatus = (studentId) => {
+    return attendance.find(
+      (record) =>
+        String(record.student_id) === String(studentId) &&
+        String(record.subject_id) === String(selectedSubject)
+    );
   };
 
   const totalStudents = students.length;
@@ -322,6 +338,7 @@ const FacultyAttendancePage = () => {
             onChange={(e) => {
               setSelectedGroup(e.target.value);
               setSelectedSubject('');
+              setAttendance([]);
             }}
           >
             <option value="">Select Group</option>
@@ -375,7 +392,7 @@ const FacultyAttendancePage = () => {
         <div className="mb-6">
           <h2 className="text-xl font-black text-slate-800">Student List</h2>
           <p className="text-sm text-slate-500 font-medium mt-1">
-            Mark attendance for students in the selected group.
+            Existing attendance from admin or faculty will appear here automatically.
           </p>
         </div>
 
@@ -385,40 +402,60 @@ const FacultyAttendancePage = () => {
           <div className="text-slate-500 font-medium">No students found for this group.</div>
         ) : (
           <div className="space-y-4">
-            {students.map((student) => (
-              <div
-                key={student.id}
-                className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 p-5 bg-slate-50 rounded-2xl border border-slate-100"
-              >
-                <div>
-                  <p className="font-bold text-slate-800">{student.name}</p>
-                  <p className="text-sm text-slate-500 font-medium">{student.email}</p>
+            {students.map((student) => {
+              const existingAttendance = getStudentAttendanceStatus(student.id);
+
+              return (
+                <div
+                  key={student.id}
+                  className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 p-5 bg-slate-50 rounded-2xl border border-slate-100"
+                >
+                  <div>
+                    <p className="font-bold text-slate-800">{student.name}</p>
+                    <p className="text-sm text-slate-500 font-medium">{student.email}</p>
+                    <p className="text-xs text-slate-400 mt-1">
+                      Current Status:{' '}
+                      <span
+                        className={`font-bold capitalize ${
+                          existingAttendance?.status === 'present'
+                            ? 'text-emerald-600'
+                            : existingAttendance?.status === 'late'
+                            ? 'text-amber-600'
+                            : existingAttendance?.status === 'absent'
+                            ? 'text-rose-600'
+                            : 'text-slate-600'
+                        }`}
+                      >
+                        {existingAttendance ? existingAttendance.status : 'Not marked'}
+                      </span>
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => markAttendance(student.id, 'present')}
+                      className="px-4 py-2 rounded-xl bg-emerald-500 text-white font-bold hover:bg-emerald-600"
+                    >
+                      Present
+                    </button>
+
+                    <button
+                      onClick={() => markAttendance(student.id, 'late')}
+                      className="px-4 py-2 rounded-xl bg-amber-500 text-white font-bold hover:bg-amber-600"
+                    >
+                      Late
+                    </button>
+
+                    <button
+                      onClick={() => markAttendance(student.id, 'absent')}
+                      className="px-4 py-2 rounded-xl bg-rose-500 text-white font-bold hover:bg-rose-600"
+                    >
+                      Absent
+                    </button>
+                  </div>
                 </div>
-
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    onClick={() => markAttendance(student.id, 'present')}
-                    className="px-4 py-2 rounded-xl bg-emerald-500 text-white font-bold hover:bg-emerald-600"
-                  >
-                    Present
-                  </button>
-
-                  <button
-                    onClick={() => markAttendance(student.id, 'late')}
-                    className="px-4 py-2 rounded-xl bg-amber-500 text-white font-bold hover:bg-amber-600"
-                  >
-                    Late
-                  </button>
-
-                  <button
-                    onClick={() => markAttendance(student.id, 'absent')}
-                    className="px-4 py-2 rounded-xl bg-rose-500 text-white font-bold hover:bg-rose-600"
-                  >
-                    Absent
-                  </button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </section>
