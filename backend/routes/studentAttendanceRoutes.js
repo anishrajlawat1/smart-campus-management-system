@@ -16,17 +16,30 @@ const {
 const { protect } = require('../middleware/authMiddleware');
 const { authorizeRoles } = require('../middleware/roleMiddleware');
 
-router.get('/groups', protect, authorizeRoles('admin'), getGroups);
+// Admin setup routes
+router.get('/groups', protect, authorizeRoles('admin', 'faculty'), getGroups);
 router.post('/groups', protect, authorizeRoles('admin'), createGroup);
 
-router.get('/groups/:groupId/students', protect, authorizeRoles('admin'), getStudentsByGroup);
-router.post('/assign-student', protect, authorizeRoles('admin'), assignStudentToGroup);
+router.get(
+  '/groups/:groupId/students',
+  protect,
+  authorizeRoles('admin', 'faculty'),
+  getStudentsByGroup
+);
 
-router.get('/subjects', protect, authorizeRoles('admin'), getSubjects);
+router.post(
+  '/assign-student',
+  protect,
+  authorizeRoles('admin'),
+  assignStudentToGroup
+);
+
+router.get('/subjects', protect, authorizeRoles('admin', 'faculty'), getSubjects);
 router.post('/subjects', protect, authorizeRoles('admin'), createSubject);
 
-router.get('/', protect, authorizeRoles('admin'), getAttendance);
-router.post('/', protect, authorizeRoles('admin'), markAttendance);
+// Attendance routes
+router.get('/', protect, authorizeRoles('admin', 'faculty'), getAttendance);
+router.post('/', protect, authorizeRoles('admin', 'faculty'), markAttendance);
 router.delete('/:id', protect, authorizeRoles('admin'), deleteAttendance);
 
 module.exports = router;

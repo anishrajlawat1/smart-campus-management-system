@@ -85,19 +85,25 @@ exports.assignStudentToGroup = async (req, res) => {
 
 // GET subjects
 exports.getSubjects = async (req, res) => {
-  const { group_id } = req.query;
+  const { group_id, faculty_id } = req.query;
 
   try {
     let query = `
       SELECT s.*, g.course_name, g.semester, g.section_name
       FROM subjects s
       JOIN groups_table g ON s.group_id = g.id
+      WHERE 1=1
     `;
     const params = [];
 
     if (group_id) {
-      query += ' WHERE s.group_id = ?';
+      query += ' AND s.group_id = ?';
       params.push(group_id);
+    }
+
+    if (faculty_id) {
+      query += ' AND s.faculty_id = ?';
+      params.push(faculty_id);
     }
 
     query += ' ORDER BY s.subject_name';
