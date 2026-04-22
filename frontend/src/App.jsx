@@ -12,7 +12,7 @@ import LostFoundManagement from './pages/admin/LostFoundManagement';
 import AnalyticsPage from './pages/admin/AnalyticsPage';
 import FacultyAttendanceManagement from './pages/admin/FacultyAttendanceManagement';
 
-import FacultyDashboard from './pages/FacultyDashboard';
+import FacultyDashboard from './pages/faculty/FacultyDashboard';
 import StudentDashboard from './pages/StudentDashboard';
 
 import ProtectedRoute from './components/ProtectedRoute';

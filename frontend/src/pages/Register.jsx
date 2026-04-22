@@ -23,18 +23,19 @@ const Register = () => {
   };
 
   const handleRegister = async (e) => {
-  e.preventDefault();
+    e.preventDefault();
+    setLoading(true);
 
-  // ✅ ADD VALIDATION HERE
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-  if (!emailRegex.test(email)) {
-    alert("Enter a valid email");
-    return;
-  }
+    if (!emailRegex.test(formData.email)) {
+      alert('Enter a valid email');
+      setLoading(false);
+      return;
+    }
 
-  try {
-    await api.post('/auth/register', { name, email, password, role });
+    try {
+      const response = await api.post('/auth/register', formData);
 
       localStorage.setItem('token', response.data.token);
       localStorage.setItem('user', JSON.stringify(response.data.user));
@@ -83,21 +84,6 @@ const Register = () => {
               Register as an administrator, faculty member, or student to access the
               Smart Campus platform.
             </p>
-          </div>
-
-          <div className="space-y-4 mt-10">
-            {[
-              'Single platform for all campus roles',
-              'Secure role-based registration flow',
-              'Consistent access to academic and administrative modules',
-            ].map((item) => (
-              <div
-                key={item}
-                className="bg-white border border-slate-100 rounded-2xl px-5 py-4 text-slate-600 font-medium shadow-sm"
-              >
-                {item}
-              </div>
-            ))}
           </div>
         </div>
 
@@ -166,7 +152,7 @@ const Register = () => {
 
               <select
                 name="role"
-                className="w-full px-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all font-medium"
+                className="w-full px-4 py-4 rounded-2xl bg-slate-50 border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all font-medium"
                 value={formData.role}
                 onChange={handleChange}
               >
