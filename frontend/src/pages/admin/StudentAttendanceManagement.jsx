@@ -33,7 +33,7 @@ const StudentAttendanceManagement = () => {
   const [subjectForm, setSubjectForm] = useState({
     subject_name: '',
     group_id: '',
-    faculty_id: '',
+    faculty_ids: [],
   });
 
   const [assignForm, setAssignForm] = useState({
@@ -134,6 +134,11 @@ const StudentAttendanceManagement = () => {
     }
   };
 
+  const handleFacultyMultiSelect = (e) => {
+    const values = Array.from(e.target.selectedOptions, (option) => Number(option.value));
+    setSubjectForm({ ...subjectForm, faculty_ids: values });
+  };
+
   const handleCreateSubject = async (e) => {
     e.preventDefault();
 
@@ -142,7 +147,7 @@ const StudentAttendanceManagement = () => {
       setSubjectForm({
         subject_name: '',
         group_id: '',
-        faculty_id: '',
+        faculty_ids: [],
       });
       fetchSubjects(selectedGroup);
       alert('Subject created successfully');
@@ -332,19 +337,21 @@ const StudentAttendanceManagement = () => {
             </select>
 
             <select
-              className="w-full px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-500"
-              value={subjectForm.faculty_id}
-              onChange={(e) =>
-                setSubjectForm({ ...subjectForm, faculty_id: e.target.value })
-              }
+              multiple
+              className="w-full px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-500 min-h-35"
+              value={subjectForm.faculty_ids.map(String)}
+              onChange={handleFacultyMultiSelect}
             >
-              <option value="">Select Faculty (Optional)</option>
               {allFaculty.map((f) => (
                 <option key={f.id} value={f.id}>
                   {f.name}
                 </option>
               ))}
             </select>
+
+            <p className="text-xs text-slate-400 font-medium">
+              Hold Ctrl (Windows) or Cmd (Mac) to select multiple faculty members.
+            </p>
 
             <button
               type="submit"
