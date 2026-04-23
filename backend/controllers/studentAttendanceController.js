@@ -2,10 +2,27 @@ const db = require('../config/db');
 
 // GET all groups
 exports.getGroups = async (req, res) => {
+  const { faculty_id } = req.query;
+
   try {
-    const [rows] = await db.execute(
-      'SELECT * FROM groups_table ORDER BY course_name, semester, section_name'
-    );
+    let query = `
+      SELECT DISTINCT g.*
+      FROM groups_table g
+    `;
+    const params = [];
+
+    if (faculty_id) {
+      query += `
+        JOIN subjects s ON s.group_id = g.id
+        JOIN subject_faculty sf ON sf.subject_id = s.id
+        WHERE sf.faculty_id = ?
+      `;
+      params.push(faculty_id);
+    }
+
+    query += ' ORDER BY g.course_name, g.semester, g.section_name';
+
+    const [rows] = await db.execute(query, params);
     res.json(rows);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -89,9 +106,10 @@ exports.getSubjects = async (req, res) => {
 
   try {
     let query = `
-      SELECT s.*, g.course_name, g.semester, g.section_name
+      SELECT DISTINCT s.*, g.course_name, g.semester, g.section_name
       FROM subjects s
       JOIN groups_table g ON s.group_id = g.id
+      LEFT JOIN subject_faculty sf ON sf.subject_id = s.id
       WHERE 1=1
     `;
     const params = [];
@@ -102,7 +120,7 @@ exports.getSubjects = async (req, res) => {
     }
 
     if (faculty_id) {
-      query += ' AND s.faculty_id = ?';
+      query += ' AND sf.faculty_id = ?';
       params.push(faculty_id);
     }
 
@@ -115,22 +133,43 @@ exports.getSubjects = async (req, res) => {
   }
 };
 
-// CREATE subject
+// CREATE subject with multiple faculty
 exports.createSubject = async (req, res) => {
-  const { subject_name, group_id, faculty_id } = req.body;
+  const { subject_name, group_id, faculty_ids } = req.body;
+
+  const conn = await db.getConnection();
 
   try {
     if (!subject_name || !group_id) {
+      conn.release();
       return res.status(400).json({ message: 'Subject name and group are required' });
     }
 
-    await db.execute(
-      'INSERT INTO subjects (subject_name, group_id, faculty_id) VALUES (?, ?, ?)',
-      [subject_name, group_id, faculty_id || null]
+    await conn.beginTransaction();
+
+    const [subjectResult] = await conn.execute(
+      'INSERT INTO subjects (subject_name, group_id) VALUES (?, ?)',
+      [subject_name, group_id]
     );
+
+    const subjectId = subjectResult.insertId;
+
+    if (Array.isArray(faculty_ids) && faculty_ids.length > 0) {
+      for (const facultyId of faculty_ids) {
+        await conn.execute(
+          'INSERT INTO subject_faculty (subject_id, faculty_id) VALUES (?, ?)',
+          [subjectId, facultyId]
+        );
+      }
+    }
+
+    await conn.commit();
+    conn.release();
 
     res.json({ message: 'Subject created successfully' });
   } catch (err) {
+    await conn.rollback();
+    conn.release();
     res.status(500).json({ message: err.message });
   }
 };

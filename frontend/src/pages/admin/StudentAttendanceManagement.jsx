@@ -10,7 +10,7 @@ import {
 import api from '../../api';
 import AdminLayout from './AdminLayout';
 
-const AttendanceManagement = () => {
+const StudentAttendanceManagement = () => {
   const [groups, setGroups] = useState([]);
   const [subjects, setSubjects] = useState([]);
   const [students, setStudents] = useState([]);
@@ -42,42 +42,62 @@ const AttendanceManagement = () => {
   });
 
   const fetchGroups = async () => {
-    const res = await api.get('/attendance/groups');
-    setGroups(res.data);
+    try {
+      const res = await api.get('/student-attendance/groups');
+      setGroups(res.data);
+    } catch (error) {
+      alert(error.response?.data?.message || 'Failed to fetch groups');
+    }
   };
 
   const fetchSubjects = async (groupId = '') => {
-    const res = await api.get('/attendance/subjects', {
-      params: groupId ? { group_id: groupId } : {},
-    });
-    setSubjects(res.data);
+    try {
+      const res = await api.get('/student-attendance/subjects', {
+        params: groupId ? { group_id: groupId } : {},
+      });
+      setSubjects(res.data);
+    } catch (error) {
+      alert(error.response?.data?.message || 'Failed to fetch subjects');
+    }
   };
 
   const fetchStudentsByGroup = async (groupId) => {
-    if (!groupId) {
-      setStudents([]);
-      return;
-    }
+    try {
+      if (!groupId) {
+        setStudents([]);
+        return;
+      }
 
-    const res = await api.get(`/attendance/groups/${groupId}/students`);
-    setStudents(res.data);
+      const res = await api.get(`/student-attendance/groups/${groupId}/students`);
+      setStudents(res.data);
+    } catch (error) {
+      alert(error.response?.data?.message || 'Failed to fetch students');
+    }
   };
 
   const fetchAttendance = async () => {
-    const res = await api.get('/attendance', {
-      params: {
-        date: selectedDate,
-        group_id: selectedGroup || undefined,
-        subject_id: selectedSubject || undefined,
-      },
-    });
-    setAttendance(res.data);
+    try {
+      const res = await api.get('/student-attendance', {
+        params: {
+          date: selectedDate,
+          group_id: selectedGroup || undefined,
+          subject_id: selectedSubject || undefined,
+        },
+      });
+      setAttendance(res.data);
+    } catch (error) {
+      alert(error.response?.data?.message || 'Failed to fetch attendance');
+    }
   };
 
   const fetchUsers = async () => {
-    const res = await api.get('/users');
-    setAllStudents(res.data.filter((u) => u.role === 'student'));
-    setAllFaculty(res.data.filter((u) => u.role === 'faculty'));
+    try {
+      const res = await api.get('/users');
+      setAllStudents(res.data.filter((u) => u.role === 'student'));
+      setAllFaculty(res.data.filter((u) => u.role === 'faculty'));
+    } catch (error) {
+      alert(error.response?.data?.message || 'Failed to fetch users');
+    }
   };
 
   useEffect(() => {
@@ -101,7 +121,7 @@ const AttendanceManagement = () => {
     e.preventDefault();
 
     try {
-      await api.post('/attendance/groups', groupForm);
+      await api.post('/student-attendance/groups', groupForm);
       setGroupForm({
         course_name: '',
         semester: '',
@@ -118,7 +138,7 @@ const AttendanceManagement = () => {
     e.preventDefault();
 
     try {
-      await api.post('/attendance/subjects', subjectForm);
+      await api.post('/student-attendance/subjects', subjectForm);
       setSubjectForm({
         subject_name: '',
         group_id: '',
@@ -135,7 +155,7 @@ const AttendanceManagement = () => {
     e.preventDefault();
 
     try {
-      await api.post('/attendance/assign-student', assignForm);
+      await api.post('/student-attendance/assign-student', assignForm);
       setAssignForm({
         student_id: '',
         group_id: '',
@@ -158,7 +178,7 @@ const AttendanceManagement = () => {
     }
 
     try {
-      await api.post('/attendance', {
+      await api.post('/student-attendance', {
         student_id: studentId,
         subject_id: selectedSubject,
         faculty_id: null,
@@ -178,7 +198,7 @@ const AttendanceManagement = () => {
     if (!confirmDelete) return;
 
     try {
-      await api.delete(`/attendance/${id}`);
+      await api.delete(`/student-attendance/${id}`);
       fetchAttendance();
     } catch (error) {
       alert(error.response?.data?.message || 'Failed to delete attendance');
@@ -238,7 +258,6 @@ const AttendanceManagement = () => {
       </section>
 
       <section className="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-10">
-        {/* Create Group */}
         <div className="bg-white rounded-3xl border border-slate-100 p-6 shadow-sm">
           <h2 className="text-xl font-black text-slate-800 mb-4">Create Group</h2>
           <form onSubmit={handleCreateGroup} className="space-y-4">
@@ -282,7 +301,6 @@ const AttendanceManagement = () => {
           </form>
         </div>
 
-        {/* Create Subject */}
         <div className="bg-white rounded-3xl border border-slate-100 p-6 shadow-sm">
           <h2 className="text-xl font-black text-slate-800 mb-4">Create Subject</h2>
           <form onSubmit={handleCreateSubject} className="space-y-4">
@@ -338,7 +356,6 @@ const AttendanceManagement = () => {
           </form>
         </div>
 
-        {/* Assign Student */}
         <div className="bg-white rounded-3xl border border-slate-100 p-6 shadow-sm">
           <h2 className="text-xl font-black text-slate-800 mb-4">Assign Student</h2>
           <form onSubmit={handleAssignStudent} className="space-y-4">
@@ -385,7 +402,6 @@ const AttendanceManagement = () => {
         </div>
       </section>
 
-      {/* Attendance Controls */}
       <section className="bg-white rounded-3xl border border-slate-100 p-6 shadow-sm mb-8">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <select
@@ -437,7 +453,6 @@ const AttendanceManagement = () => {
         </div>
       </section>
 
-      {/* Mark Attendance */}
       <section className="bg-white rounded-3xl border border-slate-100 p-6 shadow-sm mb-8">
         <h2 className="text-xl font-black text-slate-800 mb-4">Mark Attendance</h2>
 
@@ -487,7 +502,6 @@ const AttendanceManagement = () => {
         )}
       </section>
 
-      {/* Attendance Records */}
       <section className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
         <div className="p-6 border-b border-slate-100">
           <h2 className="text-xl font-black text-slate-800">Attendance Records</h2>
@@ -583,4 +597,4 @@ const AttendanceManagement = () => {
   );
 };
 
-export default AttendanceManagement;
+export default StudentAttendanceManagement;

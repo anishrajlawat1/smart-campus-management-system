@@ -160,7 +160,9 @@ const FacultyAttendancePage = () => {
 
   const fetchGroups = async () => {
     try {
-      const res = await api.get('/student-attendance/groups');
+      const res = await api.get('/student-attendance/groups', {
+        params: { faculty_id: user?.id },
+      });
       setGroups(res.data);
     } catch (error) {
       alert(error.response?.data?.message || 'Failed to fetch groups');
@@ -222,7 +224,8 @@ const FacultyAttendancePage = () => {
       fetchSubjects(selectedGroup);
     } else {
       setStudents([]);
-      fetchSubjects();
+      setSubjects([]);
+      setSelectedSubject('');
     }
   }, [selectedGroup]);
 
@@ -353,15 +356,14 @@ const FacultyAttendancePage = () => {
             className="w-full px-4 py-4 rounded-2xl bg-slate-50 border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-500"
             value={selectedSubject}
             onChange={(e) => setSelectedSubject(e.target.value)}
+            disabled={!selectedGroup}
           >
             <option value="">Select Subject</option>
-            {subjects
-              .filter((s) => !selectedGroup || String(s.group_id) === String(selectedGroup))
-              .map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.subject_name}
-                </option>
-              ))}
+            {subjects.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.subject_name}
+              </option>
+            ))}
           </select>
 
           <div className="relative">
