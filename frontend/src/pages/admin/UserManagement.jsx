@@ -33,7 +33,10 @@ const UserManagement = () => {
     try {
       setLoading(true);
       const response = await api.get('/users');
-      setUsers(response.data);
+      const data = Array.isArray(response.data)
+        ? response.data
+        : response.data.users || [];
+      setUsers(data);
     } catch (error) {
       alert(error.response?.data?.message || 'Failed to fetch users');
     } finally {
@@ -47,13 +50,16 @@ const UserManagement = () => {
 
   const filteredUsers = useMemo(() => {
     return users.filter((user) => {
-      const matchesSearch =
-        user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.role.toLowerCase().includes(searchTerm.toLowerCase());
+      const name = user.name || '';
+      const email = user.email || '';
+      const role = user.role || '';
 
-      const matchesRole =
-        roleFilter === 'all' ? true : user.role === roleFilter;
+      const matchesSearch =
+        name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        role.toLowerCase().includes(searchTerm.toLowerCase());
+
+      const matchesRole = roleFilter === 'all' || role === roleFilter;
 
       return matchesSearch && matchesRole;
     });
@@ -71,6 +77,7 @@ const UserManagement = () => {
       icon: Users,
       color: 'text-indigo-600',
       bg: 'bg-indigo-100',
+      role: 'all',
     },
     {
       label: 'Admins',
@@ -78,6 +85,7 @@ const UserManagement = () => {
       icon: ShieldCheck,
       color: 'text-violet-600',
       bg: 'bg-violet-100',
+      role: 'admin',
     },
     {
       label: 'Faculty',
@@ -85,6 +93,7 @@ const UserManagement = () => {
       icon: GraduationCap,
       color: 'text-emerald-600',
       bg: 'bg-emerald-100',
+      role: 'faculty',
     },
     {
       label: 'Students',
@@ -92,6 +101,7 @@ const UserManagement = () => {
       icon: User,
       color: 'text-blue-600',
       bg: 'bg-blue-100',
+      role: 'student',
     },
   ];
 
@@ -117,6 +127,12 @@ const UserManagement = () => {
     }
   };
 
+  const getFallbackImage = (name) => {
+    return `https://ui-avatars.com/api/?name=${encodeURIComponent(
+      name || 'User'
+    )}&background=4f46e5&color=ffffff&size=256`;
+  };
+
   const openCreateModal = () => {
     setEditingUser(null);
     setFormData({
@@ -131,10 +147,10 @@ const UserManagement = () => {
   const openEditModal = (user) => {
     setEditingUser(user);
     setFormData({
-      name: user.name,
-      email: user.email,
+      name: user.name || '',
+      email: user.email || '',
       password: '',
-      role: user.role,
+      role: user.role || 'student',
     });
     setShowModal(true);
   };
@@ -169,7 +185,10 @@ const UserManagement = () => {
 
     try {
       if (editingUser) {
-        await api.put(`/users/${editingUser.id}`, formData);
+        const updateData = { ...formData };
+        if (!updateData.password) delete updateData.password;
+
+        await api.put(`/users/${editingUser.id}`, updateData);
       } else {
         await api.post('/users', formData);
       }
@@ -182,7 +201,9 @@ const UserManagement = () => {
   };
 
   const handleDelete = async (id) => {
-    const confirmDelete = window.confirm('Are you sure you want to delete this user?');
+    const confirmDelete = window.confirm(
+      'Are you sure you want to delete this user?'
+    );
 
     if (!confirmDelete) return;
 
@@ -192,6 +213,13 @@ const UserManagement = () => {
     } catch (error) {
       alert(error.response?.data?.message || 'Delete failed');
     }
+  };
+
+  const getFilterLabel = () => {
+    if (roleFilter === 'all') return 'All Users';
+    if (roleFilter === 'admin') return 'Admins';
+    if (roleFilter === 'faculty') return 'Faculty Members';
+    return 'Students';
   };
 
   return (
@@ -204,14 +232,21 @@ const UserManagement = () => {
         {summaryCards.map((card) => (
           <div
             key={card.label}
-            className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100"
+            onClick={() => setRoleFilter(card.role)}
+            className={`bg-white p-6 rounded-3xl shadow-sm border cursor-pointer hover:shadow-lg hover:-translate-y-1 transition-all ${
+              roleFilter === card.role
+                ? 'border-indigo-300 ring-2 ring-indigo-100'
+                : 'border-slate-100'
+            }`}
           >
             <div
               className={`w-14 h-14 ${card.bg} ${card.color} rounded-2xl flex items-center justify-center mb-5`}
             >
               <card.icon size={24} />
             </div>
+
             <p className="text-slate-500 text-sm font-bold">{card.label}</p>
+
             <h3 className="text-3xl font-black text-slate-800 mt-1">
               {card.value}
             </h3>
@@ -226,6 +261,7 @@ const UserManagement = () => {
               size={18}
               className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
             />
+
             <input
               type="text"
               placeholder="Search by name, email, or role"
@@ -241,21 +277,22 @@ const UserManagement = () => {
                 size={18}
                 className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
               />
+
               <select
                 className="pl-11 pr-10 py-3 rounded-2xl bg-slate-50 border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all font-medium text-slate-700"
                 value={roleFilter}
                 onChange={(e) => setRoleFilter(e.target.value)}
               >
                 <option value="all">All Roles</option>
-                <option value="admin">Admin</option>
-                <option value="faculty">Faculty</option>
-                <option value="student">Student</option>
+                <option value="admin">Admins Only</option>
+                <option value="faculty">Faculty Only</option>
+                <option value="student">Students Only</option>
               </select>
             </div>
 
             <button
               onClick={openCreateModal}
-              className="px-5 py-3 rounded-2xl bg-indigo-600 text-white font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 flex items-center gap-2"
+              className="px-5 py-3 rounded-2xl bg-indigo-600 text-white font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 flex items-center gap-2 justify-center"
             >
               <Plus size={18} />
               Add User
@@ -267,9 +304,13 @@ const UserManagement = () => {
       <section className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
         <div className="flex items-center justify-between p-6 border-b border-slate-100">
           <div>
-            <h2 className="text-xl font-black text-slate-800">All Users</h2>
+            <h2 className="text-xl font-black text-slate-800">
+              {getFilterLabel()}
+            </h2>
+
             <p className="text-sm text-slate-500 font-medium mt-1">
-              {filteredUsers.length} user{filteredUsers.length !== 1 ? 's' : ''} found
+              {filteredUsers.length} user
+              {filteredUsers.length !== 1 ? 's' : ''} found
             </p>
           </div>
         </div>
@@ -286,12 +327,15 @@ const UserManagement = () => {
                   <th className="text-left px-6 py-4 text-xs font-bold uppercase tracking-[0.15em] text-slate-400">
                     User
                   </th>
+
                   <th className="text-left px-6 py-4 text-xs font-bold uppercase tracking-[0.15em] text-slate-400">
                     Role
                   </th>
+
                   <th className="text-left px-6 py-4 text-xs font-bold uppercase tracking-[0.15em] text-slate-400">
                     Created
                   </th>
+
                   <th className="text-right px-6 py-4 text-xs font-bold uppercase tracking-[0.15em] text-slate-400">
                     Actions
                   </th>
@@ -311,16 +355,20 @@ const UserManagement = () => {
                     >
                       <td className="px-6 py-5">
                         <div className="flex items-center gap-4">
-                          <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-700 flex items-center justify-center font-black">
-                            {user.name
-                              .split(' ')
-                              .map((part) => part[0])
-                              .join('')
-                              .slice(0, 2)
-                              .toUpperCase()}
-                          </div>
+                          <img
+                            src={user.profile_image || getFallbackImage(user.name)}
+                            alt={user.name}
+                            className="w-12 h-12 rounded-2xl object-cover border border-slate-200 bg-slate-100"
+                            onError={(e) => {
+                              e.currentTarget.src = getFallbackImage(user.name);
+                            }}
+                          />
+
                           <div>
-                            <p className="font-bold text-slate-800">{user.name}</p>
+                            <p className="font-bold text-slate-800">
+                              {user.name}
+                            </p>
+
                             <p className="text-sm text-slate-500 font-medium">
                               {user.email}
                             </p>
@@ -341,7 +389,9 @@ const UserManagement = () => {
 
                       <td className="px-6 py-5">
                         <span className="text-slate-500 font-semibold">
-                          {new Date(user.created_at).toLocaleDateString()}
+                          {user.created_at
+                            ? new Date(user.created_at).toLocaleDateString()
+                            : 'N/A'}
                         </span>
                       </td>
 
@@ -350,6 +400,7 @@ const UserManagement = () => {
                           <button
                             onClick={() => openEditModal(user)}
                             className="w-10 h-10 rounded-2xl bg-slate-50 border border-slate-200 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition-all flex items-center justify-center"
+                            title="Edit user"
                           >
                             <Pencil size={16} />
                           </button>
@@ -357,6 +408,7 @@ const UserManagement = () => {
                           <button
                             onClick={() => handleDelete(user.id)}
                             className="w-10 h-10 rounded-2xl bg-slate-50 border border-slate-200 text-slate-500 hover:text-rose-600 hover:bg-rose-50 transition-all flex items-center justify-center"
+                            title="Delete user"
                           >
                             <Trash2 size={16} />
                           </button>
@@ -372,7 +424,7 @@ const UserManagement = () => {
                       colSpan="4"
                       className="px-6 py-10 text-center text-slate-500 font-medium"
                     >
-                      No users found.
+                      No users found for this filter.
                     </td>
                   </tr>
                 )}
@@ -390,6 +442,7 @@ const UserManagement = () => {
                 <h2 className="text-2xl font-black text-slate-800">
                   {editingUser ? 'Edit User' : 'Add New User'}
                 </h2>
+
                 <p className="text-slate-500 font-medium mt-1">
                   {editingUser
                     ? 'Update user information and save changes.'
@@ -429,7 +482,9 @@ const UserManagement = () => {
               <input
                 type="password"
                 name="password"
-                placeholder={editingUser ? 'New Password (optional)' : 'Password'}
+                placeholder={
+                  editingUser ? 'New Password (optional)' : 'Password'
+                }
                 className="w-full px-4 py-4 rounded-2xl bg-slate-50 border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all font-medium"
                 value={formData.password}
                 onChange={handleChange}

@@ -18,7 +18,12 @@
   "dependencies": {
     "@tailwindcss/postcss": "^4.2.2",
     "axios": "^1.15.1",
+    "clsx": "^2.1.1",
+    "docx": "^9.6.1",
+    "file-saver": "^2.0.5",
     "lucide-react": "^1.8.0",
-    "react-router-dom": "^7.14.0"
+    "multer": "^2.1.1",
+    "react-router-dom": "^7.14.0",
+    "recharts": "^3.8.1"
   }
 }

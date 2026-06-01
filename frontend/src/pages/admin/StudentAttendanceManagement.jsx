@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   CalendarDays,
   Plus,
@@ -6,23 +6,38 @@ import {
   Users,
   BookOpen,
   Layers3,
+  CheckCircle,
+  Search,
+  X,
 } from 'lucide-react';
 import api from '../../api';
 import AdminLayout from './AdminLayout';
 
 const StudentAttendanceManagement = () => {
+  const [courses, setCourses] = useState([]);
+  const [levels, setLevels] = useState([]);
   const [groups, setGroups] = useState([]);
   const [subjects, setSubjects] = useState([]);
+  const [groupSubjects, setGroupSubjects] = useState([]);
   const [students, setStudents] = useState([]);
   const [attendance, setAttendance] = useState([]);
-  const [allStudents, setAllStudents] = useState([]);
-  const [allFaculty, setAllFaculty] = useState([]);
 
+  const [selectedCourse, setSelectedCourse] = useState('');
   const [selectedGroup, setSelectedGroup] = useState('');
   const [selectedSubject, setSelectedSubject] = useState('');
   const [selectedDate, setSelectedDate] = useState(
     new Date().toISOString().split('T')[0]
   );
+
+  const [studentSearch, setStudentSearch] = useState('');
+  const [markFilter, setMarkFilter] = useState('all');
+
+  const [courseForm, setCourseForm] = useState({ course_name: '' });
+
+  const [levelForm, setLevelForm] = useState({
+    course_id: '',
+    level_name: '',
+  });
 
   const [groupForm, setGroupForm] = useState({
     course_name: '',
@@ -32,46 +47,77 @@ const StudentAttendanceManagement = () => {
 
   const [subjectForm, setSubjectForm] = useState({
     subject_name: '',
-    group_id: '',
-    faculty_ids: [],
+    course_name: '',
+    semester: '',
   });
 
-  const [assignForm, setAssignForm] = useState({
-    student_id: '',
-    group_id: '',
-  });
+  const getFallbackImage = (name) =>
+    `https://ui-avatars.com/api/?name=${encodeURIComponent(
+      name || 'Student'
+    )}&background=4f46e5&color=ffffff&size=256`;
+
+  const fetchCourses = async () => {
+    try {
+      const res = await api.get('/student-attendance/courses');
+      setCourses(Array.isArray(res.data) ? res.data : []);
+    } catch {
+      setCourses([]);
+    }
+  };
+
+  const fetchLevels = async () => {
+    try {
+      const res = await api.get('/student-attendance/levels');
+      setLevels(Array.isArray(res.data) ? res.data : []);
+    } catch {
+      setLevels([]);
+    }
+  };
 
   const fetchGroups = async () => {
     try {
       const res = await api.get('/student-attendance/groups');
-      setGroups(res.data);
-    } catch (error) {
-      alert(error.response?.data?.message || 'Failed to fetch groups');
+      setGroups(Array.isArray(res.data) ? res.data : []);
+    } catch {
+      setGroups([]);
     }
   };
 
-  const fetchSubjects = async (groupId = '') => {
+  const fetchSubjects = async () => {
     try {
-      const res = await api.get('/student-attendance/subjects', {
+      const res = await api.get('/student-attendance/subjects');
+      setSubjects(Array.isArray(res.data) ? res.data : []);
+    } catch {
+      setSubjects([]);
+    }
+  };
+
+  const fetchGroupSubjects = async (groupId = '') => {
+    try {
+      const res = await api.get('/student-attendance/group-subjects', {
         params: groupId ? { group_id: groupId } : {},
       });
-      setSubjects(res.data);
-    } catch (error) {
-      alert(error.response?.data?.message || 'Failed to fetch subjects');
+
+      setGroupSubjects(Array.isArray(res.data) ? res.data : []);
+    } catch {
+      setGroupSubjects([]);
     }
   };
 
   const fetchStudentsByGroup = async (groupId) => {
-    try {
-      if (!groupId) {
-        setStudents([]);
-        return;
-      }
+    if (!groupId) {
+      setStudents([]);
+      return;
+    }
 
-      const res = await api.get(`/student-attendance/groups/${groupId}/students`);
-      setStudents(res.data);
-    } catch (error) {
-      alert(error.response?.data?.message || 'Failed to fetch students');
+    try {
+      const res = await api.get(
+        `/student-attendance/groups/${groupId}/students`
+      );
+
+      setStudents(Array.isArray(res.data) ? res.data : []);
+    } catch {
+      setStudents([]);
     }
   };
 
@@ -84,59 +130,194 @@ const StudentAttendanceManagement = () => {
           subject_id: selectedSubject || undefined,
         },
       });
-      setAttendance(res.data);
-    } catch (error) {
-      alert(error.response?.data?.message || 'Failed to fetch attendance');
-    }
-  };
 
-  const fetchUsers = async () => {
-    try {
-      const res = await api.get('/users');
-      setAllStudents(res.data.filter((u) => u.role === 'student'));
-      setAllFaculty(res.data.filter((u) => u.role === 'faculty'));
-    } catch (error) {
-      alert(error.response?.data?.message || 'Failed to fetch users');
+      setAttendance(Array.isArray(res.data) ? res.data : []);
+    } catch {
+      setAttendance([]);
     }
   };
 
   useEffect(() => {
+    fetchCourses();
+    fetchLevels();
     fetchGroups();
     fetchSubjects();
+    fetchGroupSubjects();
     fetchAttendance();
-    fetchUsers();
   }, []);
 
   useEffect(() => {
     if (selectedGroup) {
       fetchStudentsByGroup(selectedGroup);
-      fetchSubjects(selectedGroup);
+      fetchGroupSubjects(selectedGroup);
+      setSelectedSubject('');
+      setStudentSearch('');
+      setMarkFilter('all');
     } else {
       setStudents([]);
-      fetchSubjects();
+      fetchGroupSubjects();
+      setSelectedSubject('');
+      setStudentSearch('');
+      setMarkFilter('all');
     }
   }, [selectedGroup]);
+
+  useEffect(() => {
+    fetchAttendance();
+  }, [selectedGroup, selectedSubject, selectedDate]);
+
+  const levelsForCourseName = (courseName) => {
+    const course = courses.find((c) => c.course_name === courseName);
+
+    if (!course) return [];
+
+    return levels.filter((l) => Number(l.course_id) === Number(course.id));
+  };
+
+  const filteredGroups = selectedCourse
+    ? groups.filter((g) => g.course_name === selectedCourse)
+    : [];
+
+  const subjectsForSelectedGroup = selectedGroup
+    ? groupSubjects.filter((gs) => String(gs.group_id) === String(selectedGroup))
+    : [];
+
+  const selectedSubjectName =
+    subjectsForSelectedGroup.find(
+      (subject) => String(subject.subject_id) === String(selectedSubject)
+    )?.subject_name || 'Selected Subject';
+
+  const attendanceMap = useMemo(() => {
+    const map = {};
+
+    attendance.forEach((record) => {
+      map[String(record.student_id)] = record;
+    });
+
+    return map;
+  }, [attendance]);
+
+  const filteredStudents = useMemo(() => {
+    const query = studentSearch.toLowerCase().trim();
+
+    return students.filter((student) => {
+      const record = attendanceMap[String(student.id)];
+
+      const searchableText = `
+        ${student.name || ''}
+        ${student.email || ''}
+      `.toLowerCase();
+
+      const matchesSearch = searchableText.includes(query);
+
+      let matchesMark = true;
+
+      if (markFilter === 'marked') {
+        matchesMark = Boolean(record);
+      } else if (markFilter === 'unmarked') {
+        matchesMark = !record;
+      } else if (['present', 'late', 'absent'].includes(markFilter)) {
+        matchesMark = record?.status === markFilter;
+      }
+
+      return matchesSearch && matchesMark;
+    });
+  }, [students, attendanceMap, studentSearch, markFilter]);
+
+  const markedCount = students.filter(
+    (student) => attendanceMap[String(student.id)]
+  ).length;
+
+  const unmarkedCount = Math.max(students.length - markedCount, 0);
+
+  const presentCount = attendance.filter((a) => a.status === 'present').length;
+  const lateCount = attendance.filter((a) => a.status === 'late').length;
+  const absentCount = attendance.filter((a) => a.status === 'absent').length;
+
+  const hasStudentFilters = studentSearch || markFilter !== 'all';
+
+  const resetStudentFilters = () => {
+    setStudentSearch('');
+    setMarkFilter('all');
+  };
+
+  const refreshSetupData = async () => {
+    await fetchCourses();
+    await fetchLevels();
+    await fetchGroups();
+    await fetchSubjects();
+    await fetchGroupSubjects();
+  };
+
+  const handleCreateCourse = async (e) => {
+    e.preventDefault();
+
+    try {
+      await api.post('/student-attendance/courses', courseForm);
+      setCourseForm({ course_name: '' });
+      await refreshSetupData();
+      alert('Course created successfully');
+    } catch (error) {
+      alert(error.response?.data?.message || 'Failed to create course');
+    }
+  };
+
+  const handleDeleteCourse = async (id) => {
+    if (!window.confirm('Delete this course? Its levels will also be deleted.')) {
+      return;
+    }
+
+    try {
+      await api.delete(`/student-attendance/courses/${id}`);
+      await refreshSetupData();
+      alert('Course deleted successfully');
+    } catch (error) {
+      alert(error.response?.data?.message || 'Failed to delete course');
+    }
+  };
+
+  const handleCreateLevel = async (e) => {
+    e.preventDefault();
+
+    try {
+      await api.post('/student-attendance/levels', levelForm);
+      setLevelForm({ course_id: '', level_name: '' });
+      await refreshSetupData();
+      alert('Level created successfully');
+    } catch (error) {
+      alert(error.response?.data?.message || 'Failed to create level');
+    }
+  };
+
+  const handleDeleteLevel = async (id) => {
+    if (!window.confirm('Delete this level?')) return;
+
+    try {
+      await api.delete(`/student-attendance/levels/${id}`);
+      await refreshSetupData();
+      alert('Level deleted successfully');
+    } catch (error) {
+      alert(error.response?.data?.message || 'Failed to delete level');
+    }
+  };
 
   const handleCreateGroup = async (e) => {
     e.preventDefault();
 
     try {
       await api.post('/student-attendance/groups', groupForm);
+
       setGroupForm({
         course_name: '',
         semester: '',
         section_name: '',
       });
-      fetchGroups();
-      alert('Group created successfully');
-    } catch (error) {
-      alert(error.response?.data?.message || 'Failed to create group');
-    }
-  };
 
-  const handleFacultyMultiSelect = (e) => {
-    const values = Array.from(e.target.selectedOptions, (option) => Number(option.value));
-    setSubjectForm({ ...subjectForm, faculty_ids: values });
+      await refreshSetupData();
+      alert('Section created successfully');
+    } catch (error) {
+      alert(error.response?.data?.message || 'Failed to create section');
+    }
   };
 
   const handleCreateSubject = async (e) => {
@@ -144,63 +325,94 @@ const StudentAttendanceManagement = () => {
 
     try {
       await api.post('/student-attendance/subjects', subjectForm);
+
       setSubjectForm({
         subject_name: '',
-        group_id: '',
-        faculty_ids: [],
+        course_name: '',
+        semester: '',
       });
-      fetchSubjects(selectedGroup);
+
+      await refreshSetupData();
       alert('Subject created successfully');
     } catch (error) {
       alert(error.response?.data?.message || 'Failed to create subject');
     }
   };
 
-  const handleAssignStudent = async (e) => {
-    e.preventDefault();
-
-    try {
-      await api.post('/student-attendance/assign-student', assignForm);
-      setAssignForm({
-        student_id: '',
-        group_id: '',
-      });
-
-      if (selectedGroup) {
-        fetchStudentsByGroup(selectedGroup);
-      }
-
-      alert('Student assigned successfully');
-    } catch (error) {
-      alert(error.response?.data?.message || 'Failed to assign student');
-    }
-  };
-
-  const handleMarkAttendance = async (studentId, status) => {
-    if (!selectedSubject) {
-      alert('Please select a subject first');
+  const handleDeleteSubject = async (id) => {
+    if (
+      !window.confirm(
+        'Delete this subject? Related assignments/attendance may be removed.'
+      )
+    ) {
       return;
     }
 
     try {
+      await api.delete(`/student-attendance/subjects/${id}`);
+      await refreshSetupData();
+      alert('Subject deleted successfully');
+    } catch (error) {
+      alert(error.response?.data?.message || 'Failed to delete subject');
+    }
+  };
+
+  const handleMarkAttendance = async (studentId, status) => {
+    if (!selectedCourse || !selectedGroup || !selectedSubject) {
+      alert('Please select course, section and subject first');
+      return;
+    }
+
+    if (!status) return;
+
+    try {
       await api.post('/student-attendance', {
-        student_id: studentId,
-        subject_id: selectedSubject,
+        student_id: Number(studentId),
+        subject_id: Number(selectedSubject),
+        group_id: Number(selectedGroup),
         faculty_id: null,
         date: selectedDate,
         status,
       });
 
       fetchAttendance();
-      alert('Attendance saved successfully');
     } catch (error) {
       alert(error.response?.data?.message || 'Failed to mark attendance');
     }
   };
 
+  const handleMarkAllPresent = async () => {
+    if (!selectedCourse || !selectedGroup || !selectedSubject) {
+      alert('Please select course, section and subject first');
+      return;
+    }
+
+    if (students.length === 0) {
+      alert('No students found in this section');
+      return;
+    }
+
+    try {
+      for (const student of students) {
+        await api.post('/student-attendance', {
+          student_id: Number(student.id),
+          subject_id: Number(selectedSubject),
+          group_id: Number(selectedGroup),
+          faculty_id: null,
+          date: selectedDate,
+          status: 'present',
+        });
+      }
+
+      await fetchAttendance();
+      alert('All students marked present');
+    } catch (error) {
+      alert(error.response?.data?.message || 'Failed to mark all present');
+    }
+  };
+
   const handleDeleteAttendance = async (id) => {
-    const confirmDelete = window.confirm('Delete this attendance record?');
-    if (!confirmDelete) return;
+    if (!window.confirm('Delete this attendance record?')) return;
 
     try {
       await api.delete(`/student-attendance/${id}`);
@@ -210,9 +422,53 @@ const StudentAttendanceManagement = () => {
     }
   };
 
+  const getStatusClass = (status) => {
+    if (status === 'present') return 'bg-emerald-100 text-emerald-600';
+    if (status === 'late') return 'bg-amber-100 text-amber-600';
+    if (status === 'absent') return 'bg-rose-100 text-rose-600';
+
+    return 'bg-slate-100 text-slate-500';
+  };
+
+  const getAttendanceDropdownClass = (status) => {
+    if (status === 'present') {
+      return 'bg-emerald-50 text-emerald-700 border-emerald-200 focus:ring-emerald-500';
+    }
+
+    if (status === 'late') {
+      return 'bg-amber-50 text-amber-700 border-amber-200 focus:ring-amber-500';
+    }
+
+    if (status === 'absent') {
+      return 'bg-rose-50 text-rose-700 border-rose-200 focus:ring-rose-500';
+    }
+
+    return 'bg-slate-50 text-slate-600 border-slate-200 focus:ring-indigo-500';
+  };
+
+  const formatDateOnly = (value) => {
+    if (!value) return '';
+
+    if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      return value;
+    }
+
+    const date = new Date(value);
+
+    if (Number.isNaN(date.getTime())) {
+      return String(value).slice(0, 10);
+    }
+
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+
+    return `${year}-${month}-${day}`;
+  };
+
   const summaryCards = [
     {
-      label: 'Total Groups',
+      label: 'Total Sections',
       value: groups.length,
       icon: Layers3,
       color: 'text-indigo-600',
@@ -226,7 +482,7 @@ const StudentAttendanceManagement = () => {
       bg: 'bg-violet-100',
     },
     {
-      label: 'Assigned Students',
+      label: 'Loaded Students',
       value: students.length,
       icon: Users,
       color: 'text-emerald-600',
@@ -245,7 +501,7 @@ const StudentAttendanceManagement = () => {
     <AdminLayout
       pageLabel="Admin Module"
       title="Attendance Management"
-      subtitle="Organize classes, subjects, student groups, and daily attendance records."
+      subtitle="Create courses, levels, subjects, sections, and manage student attendance."
     >
       <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-10">
         {summaryCards.map((card) => (
@@ -253,42 +509,190 @@ const StudentAttendanceManagement = () => {
             key={card.label}
             className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100"
           >
-            <div className={`w-14 h-14 ${card.bg} ${card.color} rounded-2xl flex items-center justify-center mb-5`}>
+            <div
+              className={`w-14 h-14 ${card.bg} ${card.color} rounded-2xl flex items-center justify-center mb-5`}
+            >
               <card.icon size={24} />
             </div>
+
             <p className="text-slate-500 text-sm font-bold">{card.label}</p>
-            <h3 className="text-3xl font-black text-slate-800 mt-1">{card.value}</h3>
+
+            <h3 className="text-3xl font-black text-slate-800 mt-1">
+              {card.value}
+            </h3>
           </div>
         ))}
       </section>
 
-      <section className="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-10">
+      <section className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-10">
         <div className="bg-white rounded-3xl border border-slate-100 p-6 shadow-sm">
-          <h2 className="text-xl font-black text-slate-800 mb-4">Create Group</h2>
-          <form onSubmit={handleCreateGroup} className="space-y-4">
+          <h2 className="text-xl font-black text-slate-800 mb-2">
+            Create Course
+          </h2>
+
+          <p className="text-sm text-slate-500 font-medium mb-5">
+            Add new courses such as BSc Computing or BBA Management.
+          </p>
+
+          <form onSubmit={handleCreateCourse} className="space-y-4">
             <input
               type="text"
-              placeholder="Course Name (e.g. BSc CS)"
+              placeholder="Course e.g. BSc Computing"
               className="w-full px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-500"
-              value={groupForm.course_name}
+              value={courseForm.course_name}
+              onChange={(e) => setCourseForm({ course_name: e.target.value })}
+              required
+            />
+
+            <button
+              type="submit"
+              className="w-full py-3 rounded-2xl bg-indigo-600 text-white font-bold hover:bg-indigo-700 transition-all flex items-center justify-center gap-2"
+            >
+              <Plus size={18} />
+              Create Course
+            </button>
+          </form>
+
+          <div className="mt-5 space-y-2">
+            {courses.map((course) => (
+              <div
+                key={course.id}
+                className="flex justify-between items-center bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3"
+              >
+                <span className="font-bold text-slate-700">
+                  {course.course_name}
+                </span>
+
+                <button
+                  onClick={() => handleDeleteCourse(course.id)}
+                  className="text-rose-500 hover:bg-rose-50 p-2 rounded-xl"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="bg-white rounded-3xl border border-slate-100 p-6 shadow-sm">
+          <h2 className="text-xl font-black text-slate-800 mb-2">
+            Create Level
+          </h2>
+
+          <p className="text-sm text-slate-500 font-medium mb-5">
+            Add levels under each course, such as Level 4, Level 5, or Level 6.
+          </p>
+
+          <form onSubmit={handleCreateLevel} className="space-y-4">
+            <select
+              className="w-full px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-500"
+              value={levelForm.course_id}
               onChange={(e) =>
-                setGroupForm({ ...groupForm, course_name: e.target.value })
+                setLevelForm({ ...levelForm, course_id: e.target.value })
+              }
+              required
+            >
+              <option value="">Select Course</option>
+              {courses.map((course) => (
+                <option key={course.id} value={course.id}>
+                  {course.course_name}
+                </option>
+              ))}
+            </select>
+
+            <input
+              type="text"
+              placeholder="Level e.g. Level 6"
+              className="w-full px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-500"
+              value={levelForm.level_name}
+              onChange={(e) =>
+                setLevelForm({ ...levelForm, level_name: e.target.value })
               }
               required
             />
-            <input
-              type="text"
-              placeholder="Semester (e.g. Semester 5)"
+
+            <button
+              type="submit"
+              className="w-full py-3 rounded-2xl bg-indigo-600 text-white font-bold hover:bg-indigo-700 transition-all flex items-center justify-center gap-2"
+            >
+              <Plus size={18} />
+              Create Level
+            </button>
+          </form>
+
+          <div className="mt-5 space-y-2 max-h-56 overflow-y-auto">
+            {levels.map((level) => (
+              <div
+                key={level.id}
+                className="flex justify-between items-center bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3"
+              >
+                <span className="font-bold text-slate-700">
+                  {level.course_name} - {level.level_name}
+                </span>
+
+                <button
+                  onClick={() => handleDeleteLevel(level.id)}
+                  className="text-rose-500 hover:bg-rose-50 p-2 rounded-xl"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-10">
+        <div className="bg-white rounded-3xl border border-slate-100 p-6 shadow-sm">
+          <h2 className="text-xl font-black text-slate-800 mb-2">
+            Create Section
+          </h2>
+
+          <p className="text-sm text-slate-500 font-medium mb-5">
+            Matching subjects and demo students will be attached automatically.
+          </p>
+
+          <form onSubmit={handleCreateGroup} className="space-y-4">
+            <select
+              className="w-full px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-500"
+              value={groupForm.course_name}
+              onChange={(e) =>
+                setGroupForm({
+                  ...groupForm,
+                  course_name: e.target.value,
+                  semester: '',
+                })
+              }
+              required
+            >
+              <option value="">Select Course</option>
+              {courses.map((course) => (
+                <option key={course.id} value={course.course_name}>
+                  {course.course_name}
+                </option>
+              ))}
+            </select>
+
+            <select
               className="w-full px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-500"
               value={groupForm.semester}
               onChange={(e) =>
                 setGroupForm({ ...groupForm, semester: e.target.value })
               }
               required
-            />
+              disabled={!groupForm.course_name}
+            >
+              <option value="">Select Level/Semester</option>
+              {levelsForCourseName(groupForm.course_name).map((level) => (
+                <option key={level.id} value={level.level_name}>
+                  {level.level_name}
+                </option>
+              ))}
+            </select>
+
             <input
               type="text"
-              placeholder="Section (e.g. A)"
+              placeholder="Section e.g. L6CG7"
               className="w-full px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-500"
               value={groupForm.section_name}
               onChange={(e) =>
@@ -296,22 +700,30 @@ const StudentAttendanceManagement = () => {
               }
               required
             />
+
             <button
               type="submit"
               className="w-full py-3 rounded-2xl bg-indigo-600 text-white font-bold hover:bg-indigo-700 transition-all flex items-center justify-center gap-2"
             >
               <Plus size={18} />
-              Create Group
+              Create Section
             </button>
           </form>
         </div>
 
         <div className="bg-white rounded-3xl border border-slate-100 p-6 shadow-sm">
-          <h2 className="text-xl font-black text-slate-800 mb-4">Create Subject</h2>
+          <h2 className="text-xl font-black text-slate-800 mb-2">
+            Create Subject
+          </h2>
+
+          <p className="text-sm text-slate-500 font-medium mb-5">
+            Create a subject for a specific course and level.
+          </p>
+
           <form onSubmit={handleCreateSubject} className="space-y-4">
             <input
               type="text"
-              placeholder="Subject Name"
+              placeholder="Subject Name e.g. Web Development"
               className="w-full px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-500"
               value={subjectForm.subject_name}
               onChange={(e) =>
@@ -322,36 +734,44 @@ const StudentAttendanceManagement = () => {
 
             <select
               className="w-full px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-500"
-              value={subjectForm.group_id}
+              value={subjectForm.course_name}
               onChange={(e) =>
-                setSubjectForm({ ...subjectForm, group_id: e.target.value })
+                setSubjectForm({
+                  ...subjectForm,
+                  course_name: e.target.value,
+                  semester: '',
+                })
               }
               required
             >
-              <option value="">Select Group</option>
-              {groups.map((g) => (
-                <option key={g.id} value={g.id}>
-                  {g.course_name} - {g.semester} - Section {g.section_name}
+              <option value="">Select Course</option>
+              {courses.map((course) => (
+                <option key={course.id} value={course.course_name}>
+                  {course.course_name}
                 </option>
               ))}
             </select>
 
             <select
-              multiple
-              className="w-full px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-500 min-h-35"
-              value={subjectForm.faculty_ids.map(String)}
-              onChange={handleFacultyMultiSelect}
+              className="w-full px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-500"
+              value={subjectForm.semester}
+              onChange={(e) =>
+                setSubjectForm({ ...subjectForm, semester: e.target.value })
+              }
+              required
+              disabled={!subjectForm.course_name}
             >
-              {allFaculty.map((f) => (
-                <option key={f.id} value={f.id}>
-                  {f.name}
+              <option value="">Select Level/Semester</option>
+              {levelsForCourseName(subjectForm.course_name).map((level) => (
+                <option key={level.id} value={level.level_name}>
+                  {level.level_name}
                 </option>
               ))}
             </select>
 
-            <p className="text-xs text-slate-400 font-medium">
-              Hold Ctrl (Windows) or Cmd (Mac) to select multiple faculty members.
-            </p>
+            <div className="px-4 py-3 rounded-2xl bg-slate-100 border border-slate-200 text-slate-500 font-medium">
+              This subject will auto-attach when creating a matching course and level section.
+            </div>
 
             <button
               type="submit"
@@ -361,68 +781,75 @@ const StudentAttendanceManagement = () => {
               Create Subject
             </button>
           </form>
-        </div>
 
-        <div className="bg-white rounded-3xl border border-slate-100 p-6 shadow-sm">
-          <h2 className="text-xl font-black text-slate-800 mb-4">Assign Student</h2>
-          <form onSubmit={handleAssignStudent} className="space-y-4">
-            <select
-              className="w-full px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-500"
-              value={assignForm.student_id}
-              onChange={(e) =>
-                setAssignForm({ ...assignForm, student_id: e.target.value })
-              }
-              required
-            >
-              <option value="">Select Student</option>
-              {allStudents.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name} ({s.email})
-                </option>
-              ))}
-            </select>
+          <div className="mt-5 space-y-2 max-h-56 overflow-y-auto">
+            {subjects.map((subject) => (
+              <div
+                key={subject.id}
+                className="flex justify-between items-center bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3"
+              >
+                <span className="font-bold text-slate-700">
+                  {subject.subject_name} - {subject.course_name} -{' '}
+                  {subject.semester}
+                </span>
 
-            <select
-              className="w-full px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-500"
-              value={assignForm.group_id}
-              onChange={(e) =>
-                setAssignForm({ ...assignForm, group_id: e.target.value })
-              }
-              required
-            >
-              <option value="">Select Group</option>
-              {groups.map((g) => (
-                <option key={g.id} value={g.id}>
-                  {g.course_name} - {g.semester} - Section {g.section_name}
-                </option>
-              ))}
-            </select>
-
-            <button
-              type="submit"
-              className="w-full py-3 rounded-2xl bg-indigo-600 text-white font-bold hover:bg-indigo-700 transition-all flex items-center justify-center gap-2"
-            >
-              <Plus size={18} />
-              Assign Student
-            </button>
-          </form>
+                <button
+                  onClick={() => handleDeleteSubject(subject.id)}
+                  className="text-rose-500 hover:bg-rose-50 p-2 rounded-xl"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
       <section className="bg-white rounded-3xl border border-slate-100 p-6 shadow-sm mb-8">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <h2 className="text-xl font-black text-slate-800 mb-5">
+          Attendance Controls
+        </h2>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <select
+            className="w-full px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-500"
+            value={selectedCourse}
+            onChange={(e) => {
+              setSelectedCourse(e.target.value);
+              setSelectedGroup('');
+              setSelectedSubject('');
+              setStudents([]);
+              setAttendance([]);
+              setStudentSearch('');
+              setMarkFilter('all');
+            }}
+          >
+            <option value="">Select Course</option>
+
+            {courses.map((course) => (
+              <option key={course.id} value={course.course_name}>
+                {course.course_name}
+              </option>
+            ))}
+          </select>
+
           <select
             className="w-full px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-500"
             value={selectedGroup}
             onChange={(e) => {
               setSelectedGroup(e.target.value);
               setSelectedSubject('');
+              setAttendance([]);
+              setStudentSearch('');
+              setMarkFilter('all');
             }}
+            disabled={!selectedCourse}
           >
-            <option value="">Select Group</option>
-            {groups.map((g) => (
+            <option value="">Select Section</option>
+
+            {filteredGroups.map((g) => (
               <option key={g.id} value={g.id}>
-                {g.course_name} - {g.semester} - Section {g.section_name}
+                {g.semester} - {g.section_name}
               </option>
             ))}
           </select>
@@ -430,16 +857,20 @@ const StudentAttendanceManagement = () => {
           <select
             className="w-full px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-500"
             value={selectedSubject}
-            onChange={(e) => setSelectedSubject(e.target.value)}
+            onChange={(e) => {
+              setSelectedSubject(e.target.value);
+              setStudentSearch('');
+              setMarkFilter('all');
+            }}
+            disabled={!selectedGroup}
           >
             <option value="">Select Subject</option>
-            {subjects
-              .filter((s) => !selectedGroup || String(s.group_id) === String(selectedGroup))
-              .map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.subject_name}
-                </option>
-              ))}
+
+            {subjectsForSelectedGroup.map((s) => (
+              <option key={s.subject_id} value={s.subject_id}>
+                {s.subject_name}
+              </option>
+            ))}
           </select>
 
           <input
@@ -450,70 +881,286 @@ const StudentAttendanceManagement = () => {
           />
         </div>
 
-        <div className="mt-4">
+        <div className="mt-4 flex flex-wrap gap-3">
           <button
             onClick={fetchAttendance}
             className="px-5 py-3 rounded-2xl bg-indigo-600 text-white font-bold hover:bg-indigo-700 transition-all"
           >
-            Filter Attendance
+            Filter Attendance Records
+          </button>
+
+          <button
+            onClick={handleMarkAllPresent}
+            disabled={!selectedGroup || !selectedSubject || students.length === 0}
+            className="px-5 py-3 rounded-2xl bg-emerald-600 text-white font-bold hover:bg-emerald-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          >
+            <CheckCircle size={18} />
+            Mark All Present
           </button>
         </div>
       </section>
 
       <section className="bg-white rounded-3xl border border-slate-100 p-6 shadow-sm mb-8">
-        <h2 className="text-xl font-black text-slate-800 mb-4">Mark Attendance</h2>
+        <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4 mb-5">
+          <div>
+            <h2 className="text-xl font-black text-slate-800">
+              Smart Student Filters
+            </h2>
 
-        {!selectedGroup ? (
-          <p className="text-slate-500 font-medium">
-            Select a group first to load students.
-          </p>
-        ) : students.length === 0 ? (
-          <p className="text-slate-500 font-medium">
-            No students assigned to this group yet.
-          </p>
-        ) : (
-          <div className="space-y-4">
-            {students.map((student) => (
-              <div
-                key={student.id}
-                className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100"
-              >
-                <div>
-                  <p className="font-bold text-slate-800">{student.name}</p>
-                  <p className="text-sm text-slate-500">{student.email}</p>
-                </div>
+            <p className="text-sm text-slate-500 font-medium mt-1">
+              {filteredStudents.length} of {students.length} student
+              {students.length !== 1 ? 's' : ''} shown
+            </p>
+          </div>
 
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => handleMarkAttendance(student.id, 'present')}
-                    className="px-4 py-2 rounded-xl bg-emerald-500 text-white font-bold hover:bg-emerald-600"
-                  >
-                    Present
-                  </button>
-                  <button
-                    onClick={() => handleMarkAttendance(student.id, 'late')}
-                    className="px-4 py-2 rounded-xl bg-amber-500 text-white font-bold hover:bg-amber-600"
-                  >
-                    Late
-                  </button>
-                  <button
-                    onClick={() => handleMarkAttendance(student.id, 'absent')}
-                    className="px-4 py-2 rounded-xl bg-rose-500 text-white font-bold hover:bg-rose-600"
-                  >
-                    Absent
-                  </button>
-                </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 w-full xl:w-auto">
+            <div className="relative xl:col-span-2">
+              <Search
+                size={18}
+                className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+              />
+
+              <input
+                type="text"
+                placeholder="Search student name/email..."
+                value={studentSearch}
+                onChange={(e) => setStudentSearch(e.target.value)}
+                className="w-full pl-11 pr-10 py-3 rounded-2xl bg-slate-50 border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-500 font-medium"
+              />
+
+              {studentSearch && (
+                <button
+                  type="button"
+                  onClick={() => setStudentSearch('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-rose-500 font-black"
+                >
+                  ×
+                </button>
+              )}
+            </div>
+
+            <select
+              value={markFilter}
+              onChange={(e) => setMarkFilter(e.target.value)}
+              className="px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-500 font-medium"
+            >
+              <option value="all">All Students</option>
+              <option value="marked">Marked Only</option>
+              <option value="unmarked">Unmarked Only</option>
+              <option value="present">Present Only</option>
+              <option value="late">Late Only</option>
+              <option value="absent">Absent Only</option>
+            </select>
+          </div>
+        </div>
+
+        {selectedGroup && selectedSubject && (
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-5">
+            <div className="p-4 rounded-2xl bg-indigo-50 text-indigo-600">
+              <p className="text-xs font-black uppercase">Students</p>
+              <h3 className="text-2xl font-black mt-1">{students.length}</h3>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-emerald-50 text-emerald-600">
+              <p className="text-xs font-black uppercase">Present</p>
+              <h3 className="text-2xl font-black mt-1">{presentCount}</h3>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-amber-50 text-amber-600">
+              <p className="text-xs font-black uppercase">Late</p>
+              <h3 className="text-2xl font-black mt-1">{lateCount}</h3>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-rose-50 text-rose-600">
+              <p className="text-xs font-black uppercase">Absent</p>
+              <h3 className="text-2xl font-black mt-1">{absentCount}</h3>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-slate-50 text-slate-600">
+              <p className="text-xs font-black uppercase">Unmarked</p>
+              <h3 className="text-2xl font-black mt-1">{unmarkedCount}</h3>
+            </div>
+          </div>
+        )}
+
+        {hasStudentFilters && (
+          <button
+            type="button"
+            onClick={resetStudentFilters}
+            className="px-4 py-2 rounded-2xl bg-slate-100 text-slate-600 text-sm font-black hover:bg-slate-200 flex items-center gap-2"
+          >
+            <X size={15} />
+            Clear Student Filters
+          </button>
+        )}
+      </section>
+
+      <section className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden mb-8">
+        <div className="p-6 border-b border-slate-100">
+          <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <Users className="text-indigo-600" size={24} />
+
+              <div>
+                <h2 className="text-xl font-black text-slate-800">
+                  Students in Selected Section
+                </h2>
+
+                <p className="text-sm text-slate-500 font-medium mt-1">
+                  Update attendance using dropdown. Present, Late and Absent are
+                  saved instantly.
+                </p>
               </div>
-            ))}
+            </div>
+
+            {selectedGroup && (
+              <span className="px-4 py-2 rounded-2xl bg-indigo-50 text-indigo-600 font-bold text-sm">
+                Showing: {filteredStudents.length}/{students.length}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {!selectedCourse ? (
+          <div className="p-10 text-center text-slate-500 font-medium">
+            Select course first.
+          </div>
+        ) : !selectedGroup ? (
+          <div className="p-10 text-center text-slate-500 font-medium">
+            Select section to load students.
+          </div>
+        ) : !selectedSubject ? (
+          <div className="p-10 text-center text-slate-500 font-medium">
+            Select subject to mark attendance.
+          </div>
+        ) : students.length === 0 ? (
+          <div className="p-10 text-center text-slate-500 font-medium">
+            No students assigned to this section.
+          </div>
+        ) : filteredStudents.length === 0 ? (
+          <div className="p-10 text-center text-slate-500 font-medium">
+            No students match the selected filters.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-262.5">
+              <thead className="bg-slate-50">
+                <tr>
+                  <th className="px-4 py-4 text-left text-xs font-black uppercase tracking-[0.12em] text-slate-400">
+                    Student
+                  </th>
+
+                  <th className="px-4 py-4 text-left text-xs font-black uppercase tracking-[0.12em] text-slate-400">
+                    Email
+                  </th>
+
+                  <th className="px-4 py-4 text-left text-xs font-black uppercase tracking-[0.12em] text-slate-400">
+                    Subject
+                  </th>
+
+                  <th className="px-4 py-4 text-left text-xs font-black uppercase tracking-[0.12em] text-slate-400">
+                    Date
+                  </th>
+
+                  <th className="px-4 py-4 text-left text-xs font-black uppercase tracking-[0.12em] text-slate-400">
+                    Current Status
+                  </th>
+
+                  <th className="px-4 py-4 text-left text-xs font-black uppercase tracking-[0.12em] text-slate-400">
+                    Update
+                  </th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {filteredStudents.map((student) => {
+                  const record = attendanceMap[String(student.id)];
+                  const currentStatus = record?.status || 'unmarked';
+
+                  return (
+                    <tr
+                      key={student.id}
+                      className="border-t border-slate-100 hover:bg-slate-50 transition-all"
+                    >
+                      <td className="px-4 py-4">
+                        <div className="flex items-center gap-3">
+                          <img
+                            src={
+                              student.profile_image ||
+                              getFallbackImage(student.name)
+                            }
+                            alt={student.name}
+                            className="w-11 h-11 rounded-xl object-cover border border-slate-200 bg-slate-100"
+                            onError={(e) => {
+                              e.currentTarget.src = getFallbackImage(
+                                student.name
+                              );
+                            }}
+                          />
+
+                          <p className="font-bold text-slate-800">
+                            {student.name}
+                          </p>
+                        </div>
+                      </td>
+
+                      <td className="px-4 py-4 text-slate-500 font-medium">
+                        {student.email}
+                      </td>
+
+                      <td className="px-4 py-4 text-slate-700 font-medium">
+                        {selectedSubjectName}
+                      </td>
+
+                      <td className="px-4 py-4 text-slate-500 font-medium">
+                        {selectedDate}
+                      </td>
+
+                      <td className="px-4 py-4">
+                        <span
+                          className={`inline-flex px-3 py-2 rounded-2xl text-xs font-black uppercase ${getStatusClass(
+                            currentStatus
+                          )}`}
+                        >
+                          {currentStatus}
+                        </span>
+                      </td>
+
+                      <td className="px-4 py-4">
+                        <select
+                          value={
+                            currentStatus === 'unmarked' ? '' : currentStatus
+                          }
+                          onChange={(e) =>
+                            handleMarkAttendance(student.id, e.target.value)
+                          }
+                          className={`px-4 py-3 rounded-2xl border outline-none focus:ring-2 font-bold min-w-40 capitalize ${getAttendanceDropdownClass(
+                            currentStatus
+                          )}`}
+                        >
+                          <option value="">Select Status</option>
+                          <option value="present">Present</option>
+                          <option value="late">Late</option>
+                          <option value="absent">Absent</option>
+                        </select>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         )}
       </section>
 
       <section className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
         <div className="p-6 border-b border-slate-100">
-          <h2 className="text-xl font-black text-slate-800">Attendance Records</h2>
+          <h2 className="text-xl font-black text-slate-800">
+            Saved Attendance History
+          </h2>
+
           <p className="text-sm text-slate-500 font-medium mt-1">
-            View attendance by course, section, subject, and date
+            Review saved attendance records or delete incorrect entries.
           </p>
         </div>
 
@@ -521,78 +1168,89 @@ const StudentAttendanceManagement = () => {
           <table className="w-full min-w-250">
             <thead className="bg-slate-50">
               <tr>
-                <th className="text-left px-6 py-4 text-xs font-bold uppercase tracking-[0.15em] text-slate-400">
+                <th className="px-4 py-4 text-left text-xs font-black uppercase text-slate-400">
                   Student
                 </th>
-                <th className="text-left px-6 py-4 text-xs font-bold uppercase tracking-[0.15em] text-slate-400">
-                  Email
+
+                <th className="px-4 py-4 text-left text-xs font-black uppercase text-slate-400">
+                  Course / Section
                 </th>
-                <th className="text-left px-6 py-4 text-xs font-bold uppercase tracking-[0.15em] text-slate-400">
-                  Course
-                </th>
-                <th className="text-left px-6 py-4 text-xs font-bold uppercase tracking-[0.15em] text-slate-400">
+
+                <th className="px-4 py-4 text-left text-xs font-black uppercase text-slate-400">
                   Subject
                 </th>
-                <th className="text-left px-6 py-4 text-xs font-bold uppercase tracking-[0.15em] text-slate-400">
-                  Status
-                </th>
-                <th className="text-left px-6 py-4 text-xs font-bold uppercase tracking-[0.15em] text-slate-400">
+
+                <th className="px-4 py-4 text-left text-xs font-black uppercase text-slate-400">
                   Date
                 </th>
-                <th className="text-right px-6 py-4 text-xs font-bold uppercase tracking-[0.15em] text-slate-400">
+
+                <th className="px-4 py-4 text-left text-xs font-black uppercase text-slate-400">
+                  Status
+                </th>
+
+                <th className="px-4 py-4 text-right text-xs font-black uppercase text-slate-400">
                   Action
                 </th>
               </tr>
             </thead>
 
             <tbody>
-              {attendance.map((a, index) => (
-                <tr
-                  key={a.id}
-                  className={`border-t border-slate-100 hover:bg-slate-50 ${
-                    index === 0 ? 'border-t-0' : ''
-                  }`}
-                >
-                  <td className="px-6 py-5 font-bold text-slate-800">{a.student_name}</td>
-                  <td className="px-6 py-5 text-slate-500 font-medium">{a.student_email}</td>
-                  <td className="px-6 py-5 text-slate-700 font-medium">
-                    {a.course_name} - {a.semester} - {a.section_name}
-                  </td>
-                  <td className="px-6 py-5 text-slate-700 font-medium">{a.subject_name}</td>
-                  <td className="px-6 py-5">
-                    <span
-                      className={`inline-flex px-3 py-2 rounded-2xl text-sm font-bold capitalize ${
-                        a.status === 'present'
-                          ? 'bg-emerald-100 text-emerald-600'
-                          : a.status === 'late'
-                          ? 'bg-amber-100 text-amber-600'
-                          : 'bg-rose-100 text-rose-600'
-                      }`}
-                    >
-                      {a.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-5 text-slate-500 font-medium">
-                    {new Date(a.date).toLocaleDateString()}
-                  </td>
-                  <td className="px-6 py-5 text-right">
-                    <button
-                      onClick={() => handleDeleteAttendance(a.id)}
-                      className="w-10 h-10 rounded-2xl bg-slate-50 border border-slate-200 text-slate-500 hover:text-rose-600 hover:bg-rose-50 transition-all inline-flex items-center justify-center"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {attendance.length > 0 ? (
+                attendance.map((record) => (
+                  <tr
+                    key={record.id}
+                    className="border-t border-slate-100 hover:bg-slate-50"
+                  >
+                    <td className="px-4 py-4">
+                      <p className="font-bold text-slate-800">
+                        {record.student_name}
+                      </p>
 
-              {attendance.length === 0 && (
+                      <p className="text-sm text-slate-500">
+                        {record.student_email}
+                      </p>
+                    </td>
+
+                    <td className="px-4 py-4 text-slate-600 font-medium">
+                      {record.course_name} / {record.semester} /{' '}
+                      {record.section_name}
+                    </td>
+
+                    <td className="px-4 py-4 text-slate-600 font-medium">
+                      {record.subject_name}
+                    </td>
+
+                    <td className="px-4 py-4 text-slate-600 font-medium">
+                      {formatDateOnly(record.date)}
+                    </td>
+
+                    <td className="px-4 py-4">
+                      <span
+                        className={`px-3 py-1 rounded-full text-xs font-black uppercase ${getStatusClass(
+                          record.status
+                        )}`}
+                      >
+                        {record.status}
+                      </span>
+                    </td>
+
+                    <td className="px-4 py-4 text-right">
+                      <button
+                        onClick={() => handleDeleteAttendance(record.id)}
+                        className="w-10 h-10 rounded-2xl bg-rose-50 text-rose-600 hover:bg-rose-100 inline-flex items-center justify-center"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              ) : (
                 <tr>
                   <td
-                    colSpan="7"
-                    className="px-6 py-10 text-center text-slate-500 font-medium"
+                    colSpan="6"
+                    className="px-4 py-10 text-center text-slate-500 font-medium"
                   >
-                    No attendance records found.
+                    No attendance records found for the selected filters.
                   </td>
                 </tr>
               )}

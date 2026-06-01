@@ -5,7 +5,7 @@ const bcrypt = require('bcryptjs');
 exports.getAllUsers = async (req, res) => {
   try {
     const [rows] = await db.execute(
-      'SELECT id, name, email, role, created_at FROM users ORDER BY id DESC'
+      'SELECT id, name, email, role, profile_image, created_at FROM users ORDER BY id DESC'
     );
 
     res.status(200).json(rows);
@@ -27,6 +27,7 @@ exports.createUser = async (req, res) => {
     }
 
     const validRoles = ['admin', 'faculty', 'student'];
+
     if (!validRoles.includes(role)) {
       return res.status(400).json({ message: 'Invalid role' });
     }
@@ -49,7 +50,7 @@ exports.createUser = async (req, res) => {
     );
 
     const [newUserRows] = await db.execute(
-      'SELECT id, name, email, role, created_at FROM users WHERE id = ?',
+      'SELECT id, name, email, role, profile_image, created_at FROM users WHERE id = ?',
       [result.insertId]
     );
 
@@ -83,6 +84,12 @@ exports.updateUser = async (req, res) => {
     const updatedEmail = email || currentUser.email;
     const updatedRole = role || currentUser.role;
 
+    const validRoles = ['admin', 'faculty', 'student'];
+
+    if (!validRoles.includes(updatedRole)) {
+      return res.status(400).json({ message: 'Invalid role' });
+    }
+
     if (password && password.trim() !== '') {
       const salt = await bcrypt.genSalt(10);
       const hashedPassword = await bcrypt.hash(password, salt);
@@ -99,7 +106,7 @@ exports.updateUser = async (req, res) => {
     }
 
     const [updatedUserRows] = await db.execute(
-      'SELECT id, name, email, role, created_at FROM users WHERE id = ?',
+      'SELECT id, name, email, role, profile_image, created_at FROM users WHERE id = ?',
       [id]
     );
 

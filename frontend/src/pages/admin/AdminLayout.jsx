@@ -1,64 +1,27 @@
 import React from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import {
+  LayoutDashboard,
   Users,
   CheckSquare,
-  MessageSquare,
+  UserPlus,
+  UserCheck,
+  Link2,
   Calendar,
+  MessageSquare,
   Search,
   BarChart3,
-  Bell,
   LogOut,
-  ArrowUpRight,
-  UserCheck,
+  FileText,
 } from 'lucide-react';
-
-const adminModules = [
-  {
-    title: 'User Management',
-    icon: Users,
-    path: '/admin/users',
-  },
-  {
-    title: 'Student Attendance',
-    icon: CheckSquare,
-    path: '/admin/attendance',
-  },
-  {
-    title: 'Faculty Attendance',
-    icon: UserCheck,
-    path: '/admin/faculty-attendance',
-  },
-  {
-    title: 'Smart Notices',
-    icon: MessageSquare,
-    path: '/admin/notices',
-  },
-  {
-    title: 'Event Scheduler',
-    icon: Calendar,
-    path: '/admin/events',
-  },
-  {
-    title: 'Lost & Found',
-    icon: Search,
-    path: '/admin/lost-found',
-  },
-  {
-    title: 'Data Analytics',
-    icon: BarChart3,
-    path: '/admin/analytics',
-  },
-];
 
 const AdminLayout = ({
   pageLabel = 'Admin Module',
-  title = 'Admin Page',
-  subtitle = 'Manage the system from one place.',
+  title = 'Dashboard',
+  subtitle = 'Manage the system efficiently.',
   children,
 }) => {
   const navigate = useNavigate();
-  const location = useLocation();
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -66,99 +29,91 @@ const AdminLayout = ({
     navigate('/login');
   };
 
+  const adminModules = [
+    { title: 'Dashboard', icon: LayoutDashboard, path: '/admin-dashboard' },
+    { title: 'User Management', icon: Users, path: '/admin/users' },
+    { title: 'Student Attendance', icon: CheckSquare, path: '/admin/attendance' },
+    {
+      title: 'Attendance Reports',
+      icon: FileText,
+      path: '/admin/attendance-reports',
+    },
+    {
+      title: 'Student Assignment',
+      icon: UserPlus,
+      path: '/admin/student-assignment',
+    },
+    {
+      title: 'Faculty Attendance',
+      path: '/admin/faculty-attendance',
+      icon: UserCheck,
+    },
+    {
+      title: 'Faculty Subjects',
+      path: '/admin/faculty-subjects',
+      icon: Link2,
+    },
+    { title: 'Class Routine', path: '/admin/routines', icon: Calendar },
+    { title: 'Exam Seating', path: '/admin/exams', icon: FileText },
+    { title: 'Smart Notices', icon: MessageSquare, path: '/admin/notices' },
+    { title: 'Event Scheduler', icon: Calendar, path: '/admin/events' },
+    { title: 'Lost & Found', icon: Search, path: '/admin/lost-found' },
+    { title: 'Data Analytics', icon: BarChart3, path: '/admin/analytics' },
+  ];
+
   return (
-    <div className="min-h-screen bg-[#F1F5F9] flex">
-      <aside className="w-72 bg-white border-r border-slate-200 hidden lg:flex flex-col">
-        <div className="p-8 border-b border-slate-100">
-          <h2 className="text-2xl font-black text-indigo-600 tracking-tighter italic">
-            SmartCampus
-          </h2>
-          <p className="text-xs text-slate-400 font-bold tracking-[0.2em] uppercase mt-2">
-            Admin Panel
-          </p>
-        </div>
+    <div className="flex min-h-screen bg-slate-100">
+      <aside className="w-64 bg-white border-r border-slate-200 p-6 flex flex-col">
+        <h2 className="text-2xl font-black text-indigo-600 mb-8">
+          SmartCampus
+        </h2>
 
-        <nav className="flex-1 px-4 py-6 overflow-y-auto">
-          <p className="px-3 text-xs font-bold text-slate-400 uppercase tracking-[0.2em] mb-3">
-            Main
-          </p>
+        <nav className="space-y-2 flex-1 overflow-y-auto pr-1">
+          {adminModules.map((item) => {
+            const Icon = item.icon;
 
-          <div className="space-y-2">
-            {adminModules.map((m) => {
-              const isActive = location.pathname === m.path;
-
-              return (
-                <div
-                  key={m.title}
-                  onClick={() => navigate(m.path)}
-                  className={`flex items-center justify-between p-3.5 rounded-2xl cursor-pointer transition-all group ${
+            return (
+              <NavLink
+                key={item.title}
+                to={item.path}
+                className={({ isActive }) =>
+                  `flex items-center gap-3 px-4 py-3 rounded-2xl font-medium transition-all ${
                     isActive
-                      ? 'bg-indigo-50 text-indigo-600'
-                      : 'text-slate-600 hover:bg-slate-50 hover:text-indigo-600'
-                  }`}
-                >
-                  <div className="flex items-center space-x-3">
-                    <m.icon size={20} />
-                    <span className="font-semibold">{m.title}</span>
-                  </div>
-
-                  <ArrowUpRight
-                    size={16}
-                    className={`transition-opacity ${
-                      isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-                    }`}
-                  />
-                </div>
-              );
-            })}
-          </div>
+                      ? 'bg-indigo-100 text-indigo-600'
+                      : 'text-slate-600 hover:bg-slate-100'
+                  }`
+                }
+              >
+                <Icon size={18} />
+                <span className="truncate">{item.title}</span>
+              </NavLink>
+            );
+          })}
         </nav>
 
-        <div className="p-4 border-t border-slate-100">
-          <div className="bg-slate-50 rounded-2xl p-4 mb-3">
-            <p className="text-sm font-bold text-slate-800">Administrator</p>
-            <p className="text-xs text-slate-500 mt-1">System control and monitoring</p>
-          </div>
-
-          <div
-            onClick={handleLogout}
-            className="flex items-center space-x-3 p-3.5 text-rose-500 hover:bg-rose-50 rounded-2xl cursor-pointer font-bold transition-all"
-          >
-            <LogOut size={20} />
-            <span>Sign Out</span>
-          </div>
-        </div>
+        <button
+          onClick={handleLogout}
+          className="mt-6 flex items-center gap-3 px-4 py-3 rounded-2xl font-bold text-rose-600 hover:bg-rose-50 transition-all"
+        >
+          <LogOut size={18} />
+          Logout
+        </button>
       </aside>
 
-      <main className="flex-1 p-10 overflow-y-auto">
-        <header className="flex justify-between items-start mb-10">
-          <div>
-            <p className="text-sm font-bold uppercase tracking-[0.2em] text-slate-400 mb-2">
-              {pageLabel}
-            </p>
-            <h1 className="text-4xl font-black text-slate-800 tracking-tight">
-              {title}
-            </h1>
+      <main className="flex-1 p-8 overflow-x-hidden">
+        <div className="mb-8">
+          <p className="text-sm uppercase tracking-widest text-slate-400 font-bold">
+            {pageLabel}
+          </p>
+
+          <h1 className="text-4xl font-black text-slate-800 mt-2">
+            {title}
+          </h1>
+
+          {subtitle && (
             <p className="text-slate-500 font-medium mt-2">{subtitle}</p>
-          </div>
-
-          <div className="flex items-center space-x-4">
-            <button className="relative p-3 bg-white border border-slate-200 rounded-2xl text-slate-500 hover:text-indigo-600 transition-colors shadow-sm">
-              <Bell size={20} />
-              <span className="absolute -top-1 -right-1 w-3 h-3 bg-rose-500 rounded-full border-2 border-white" />
-            </button>
-
-            <div className="flex items-center gap-3 bg-white border border-slate-200 rounded-2xl px-4 py-3 shadow-sm">
-              <div className="h-12 w-12 bg-indigo-600 rounded-2xl flex items-center justify-center text-white font-black shadow-lg shadow-indigo-200">
-                AD
-              </div>
-              <div className="hidden sm:block">
-                <p className="text-sm font-bold text-slate-800">Admin User</p>
-                <p className="text-xs text-slate-500">Super Administrator</p>
-              </div>
-            </div>
-          </div>
-        </header>
+          )}
+        </div>
 
         {children}
       </main>
