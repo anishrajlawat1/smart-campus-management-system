@@ -22,7 +22,9 @@ const notificationRoutes = require('./routes/notificationRoutes');
 const examRoutes = require('./routes/examRoutes');
 
 const app = express();
-
+app.get('/', (req, res) => {
+  res.send('SCMS Backend is running');
+});
 app.use(cors());
 app.use(express.json());
 
