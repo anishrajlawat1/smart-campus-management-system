@@ -46,19 +46,23 @@ app.use('/api/faculty', facultyProfileRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/exams', examRoutes);
 
+app.get('/', (req, res) => {
+  res.send('SCMS Backend is running');
+});
+
 const startServer = async () => {
-  try {
-    await db.execute('SELECT 1');
-    console.log('Database connected successfully');
+  const PORT = process.env.PORT || 5000;
 
-    const PORT = process.env.PORT || 5000;
+  app.listen(PORT, async () => {
+    console.log(`Server running on port ${PORT}`);
 
-    app.listen(PORT, () => {
-      console.log(`Server running on port ${PORT}`);
-    });
-  } catch (error) {
-    console.error('Database connection failed:', error.message);
-  }
+    try {
+      await db.execute('SELECT 1');
+      console.log('Database connected successfully');
+    } catch (error) {
+      console.error('Database connection failed FULL ERROR:', error);
+    }
+  });
 };
 
 startServer();
